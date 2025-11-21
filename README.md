@@ -2,6 +2,21 @@
 
 A full-stack collaborative mind mapping application with a Spring Boot REST API backend and a React TypeScript frontend.
 
+## Table of Contents
+
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [System Architecture](#system-architecture)
+- [Prerequisites](#prerequisites)
+- [Building the Application](#building-the-application)
+- [Running the Application](#running-the-application)
+- [Accessing the Application](#accessing-the-application)
+- [API Examples](#api-examples)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Project Structure](#project-structure)
+- [Development](#development)
+
 ## Features
 
 - **Mind Map Management**: Create, update, delete, and organize mind maps
@@ -48,96 +63,441 @@ A full-stack collaborative mind mapping application with a Spring Boot REST API 
 ### Frontend
 - **Node.js 18+** and npm
 
-## Quick Start
+## System Architecture
 
-### Option 1: Backend Only
+### High-Level Architecture
 
-To run just the backend API:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENT TIER                             │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │           React 19 + TypeScript Frontend                  │  │
+│  │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐  │  │
+│  │  │   Pages     │  │  Components  │  │   API Client    │  │  │
+│  │  │ (Dashboard, │  │  (Layout,    │  │   (Axios)       │  │  │
+│  │  │  MindMap)   │  │   Common)    │  │                 │  │  │
+│  │  └─────────────┘  └──────────────┘  └─────────────────┘  │  │
+│  │         │                 │                    │          │  │
+│  │         └─────────────────┴────────────────────┘          │  │
+│  │                           │                                │  │
+│  │                  TanStack Query (State)                    │  │
+│  │                   Tailwind CSS (Styling)                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                              │                                   │
+│                         HTTP/REST                                │
+└──────────────────────────────┼───────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      APPLICATION TIER                           │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │          Spring Boot 3.2.0 REST API                       │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │  │
+│  │  │ Controllers  │  │   Services   │  │  Repositories  │  │  │
+│  │  │              │  │              │  │                │  │  │
+│  │  │ - MindMap    │→ │ - Business   │→ │ - Spring Data  │  │  │
+│  │  │ - Node       │  │   Logic      │  │   JPA          │  │  │
+│  │  │ - Link       │  │ - Validation │  │                │  │  │
+│  │  │ - Comment    │  │ - TX Mgmt    │  │                │  │  │
+│  │  │ - Attachment │  │              │  │                │  │  │
+│  │  └──────────────┘  └──────────────┘  └────────────────┘  │  │
+│  │         │                 │                    │          │  │
+│  │         └─────────────────┴────────────────────┘          │  │
+│  │                           │                                │  │
+│  │                    JPA/Hibernate                            │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                              │                                   │
+└──────────────────────────────┼───────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        DATA TIER                                │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │         H2 Database (Dev) / PostgreSQL (Prod)             │  │
+│  │                                                            │  │
+│  │  Tables: users, mindmaps, nodes, node_links,              │  │
+│  │          comments, attachments, tags, participants        │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │              File System (Attachments)                    │  │
+│  │                   ./uploads/                              │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-#### 1. Set Java 21 as Active Version
+### Data Model Design
 
-If you have multiple Java versions installed:
+#### Entity Relationship Diagram
+
+```
+┌─────────────┐
+│    User     │
+│─────────────│
+│ id (PK)     │
+│ username    │
+│ displayName │
+│ email       │
+└──────┬──────┘
+       │
+       │ owns (1:N)
+       ▼
+┌─────────────────┐           ┌──────────────┐
+│    MindMap      │◄─────────►│ Participant  │
+│─────────────────│  (1:N)    │──────────────│
+│ id (PK)         │           │ id (PK)      │
+│ name            │           │ mindmapId    │
+│ description     │           │ userId       │
+│ ownerId (FK)    │           │ role         │
+│ layout config   │           │ permissions  │
+│ visibility      │           └──────────────┘
+└────────┬────────┘
+         │
+         │ contains (1:N, via mindmapId field)
+         ▼
+┌─────────────────┐
+│      Node       │
+│─────────────────│
+│ id (PK)         │
+│ mindmapId       │ ← Not JPA @ManyToOne, just String field
+│ parentId        │ ← Parent-child via field, not JPA relation
+│ title           │
+│ description     │
+│ color           │
+│ position        │
+│ tags[]          │
+└────┬────┬───────┘
+     │    │
+     │    └─────────┐
+     │              │
+     │ (1:N)        │ (1:N)
+     ▼              ▼
+┌──────────┐   ┌────────────┐
+│ Comment  │   │ Attachment │
+│──────────│   │────────────│
+│ id (PK)  │   │ id (PK)    │
+│ nodeId   │   │ nodeId     │
+│ text     │   │ filename   │
+│ authorId │   │ filePath   │
+└──────────┘   │ fileSize   │
+               │ mimeType   │
+               │ metadata   │
+               └────────────┘
+
+     Node ──────────► NodeLink ◄────────── Node
+   (source)            │              (target)
+                  ┌────┴─────┐
+                  │ NodeLink │
+                  │──────────│
+                  │ id (PK)  │
+                  │ sourceId │
+                  │ targetId │
+                  │ linkType │
+                  │ label    │
+                  └──────────┘
+```
+
+#### Key Design Decisions
+
+1. **Loose Node-MindMap Coupling**: Nodes reference their mind map via `mindmapId` String field rather than JPA `@ManyToOne`. This provides:
+   - Flexibility in graph traversal algorithms
+   - Easier node migration between mind maps (future feature)
+   - Simplified JSON serialization without circular references
+
+2. **Parent-Child via Field**: Node hierarchy uses `parentId` String field instead of self-referential JPA relationship:
+   - Avoids N+1 query problems in deep hierarchies
+   - Simpler recursive algorithms for tree operations
+   - No risk of LazyInitializationException
+
+3. **Embedded Components**: `LayoutConfiguration` and `NodePosition` are `@Embeddable`:
+   - Stored as columns in parent table (no JOIN needed)
+   - Strongly typed configuration objects
+   - Value object semantics
+
+4. **Soft Links (NodeLink)**: Separate entity for node-to-node relationships:
+   - Represents semantic connections ("depends-on", "relates-to")
+   - Distinct from parent-child hierarchy
+   - Enables graph algorithms (shortest path, cycles, etc.)
+
+5. **UUID Primary Keys**: All entities use UUID via `@GeneratedValue(strategy = GenerationType.UUID)`:
+   - Globally unique across distributed systems
+   - No auto-increment conflicts in clustering
+   - Safe to expose in URLs
+
+### Backend Architecture (Layered)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     PRESENTATION LAYER                      │
+│                                                             │
+│  REST Controllers (@RestController)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
+│  │   MindMap    │  │     Node     │  │   Attachment    │   │
+│  │  Controller  │  │  Controller  │  │   Controller    │   │
+│  └──────────────┘  └──────────────┘  └─────────────────┘   │
+│                                                             │
+│  - Request validation (@Valid)                              │
+│  - DTO mapping                                              │
+│  - HTTP status codes                                        │
+│  - Exception handling (GlobalExceptionHandler)              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      SERVICE LAYER                          │
+│                                                             │
+│  Business Logic (@Service, @Transactional)                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
+│  │   MindMap    │  │     Node     │  │   Attachment    │   │
+│  │   Service    │  │   Service    │  │    Service      │   │
+│  └──────────────┘  └──────────────┘  └─────────────────┘   │
+│                                                             │
+│  - Business rules enforcement                               │
+│  - Transaction management                                   │
+│  - Authorization checks                                     │
+│  - Cross-entity operations                                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    PERSISTENCE LAYER                        │
+│                                                             │
+│  Spring Data JPA Repositories                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
+│  │   MindMap    │  │     Node     │  │   Attachment    │   │
+│  │  Repository  │  │  Repository  │  │   Repository    │   │
+│  └──────────────┘  └──────────────┘  └─────────────────┘   │
+│                                                             │
+│  - CRUD operations                                          │
+│  - Custom query methods                                     │
+│  - Pagination & sorting                                     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       DOMAIN LAYER                          │
+│                                                             │
+│  JPA Entities (@Entity)                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
+│  │   MindMap    │  │     Node     │  │   Attachment    │   │
+│  └──────────────┘  └──────────────┘  └─────────────────┘   │
+│                                                             │
+│  - Domain model                                             │
+│  - Relationships & constraints                              │
+│  - Audit fields (createdAt, updatedAt)                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Frontend Architecture (Component-Based)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       ROUTING LAYER                         │
+│                   React Router v7                           │
+│                                                             │
+│  Routes:                                                    │
+│    /                 → Dashboard                            │
+│    /mindmap/:id      → MindMapView                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       PAGE LAYER                            │
+│                                                             │
+│  ┌──────────────┐              ┌─────────────────┐          │
+│  │  Dashboard   │              │  MindMapView    │          │
+│  │──────────────│              │─────────────────│          │
+│  │ - List maps  │              │ - Map details   │          │
+│  │ - Create map │              │ - Node list     │          │
+│  │ - Delete map │              │ - Participants  │          │
+│  └──────────────┘              └─────────────────┘          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    COMPONENT LAYER                          │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐   │
+│  │   Layout     │  │  MindMapCard │  │   NodeItem      │   │
+│  │  (Header,    │  │              │  │                 │   │
+│  │   Nav)       │  │              │  │                 │   │
+│  └──────────────┘  └──────────────┘  └─────────────────┘   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    STATE MANAGEMENT                         │
+│                                                             │
+│  TanStack Query (React Query)                               │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ - Server state caching                               │   │
+│  │ - Automatic refetching                               │   │
+│  │ - Optimistic updates                                 │   │
+│  │ - Query invalidation                                 │   │
+│  └──────────────────────────────────────────────────────┘   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       API LAYER                             │
+│                                                             │
+│  Axios HTTP Client (src/api/client.ts)                      │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ mindMapApi: { list, create, get, update, delete }    │   │
+│  │ nodeApi: { list, create, get, update, delete }       │   │
+│  │ nodeLinkApi: { list, create, delete }                │   │
+│  │ attachmentApi: { upload, download }                  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  TypeScript interfaces matching OpenAPI spec                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Building the Application
+
+### Backend Build
+
+The backend is built using Maven. **Java 21 is required** (Lombok compatibility issue with Java 25+).
+
+#### Step 1: Set Java Version
 
 ```bash
-# On macOS
+# On macOS, set JAVA_HOME to Java 21
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 
-# Verify
+# Verify Java version
 java --version
+# Should output: openjdk 21.0.x
 ```
 
-#### 2. Build the Project
+#### Step 2: Clean Build
 
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+# Clean and compile
 mvn clean install
+
+# Skip tests for faster build
+mvn clean install -DskipTests
 ```
 
-#### 3. Run the Application
+This produces `target/mindcontroll-1.0.0.jar`.
+
+#### Step 3: Run Tests (Optional)
 
 ```bash
+mvn test
+```
+
+### Frontend Build
+
+The frontend is built with Vite.
+
+#### Step 1: Install Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+#### Step 2: Build for Production
+
+```bash
+npm run build
+```
+
+This creates optimized bundles in `frontend/dist/`.
+
+#### Step 3: Preview Production Build (Optional)
+
+```bash
+npm run preview
+```
+
+## Running the Application
+
+### Option 1: Run Backend Only
+
+#### Development Mode (Maven)
+
+```bash
+# Set Java 21
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+
+# Run with empty database
 mvn spring-boot:run
-```
 
-The application will start on `http://localhost:8080/api/v1`
-
-#### 4. Run with Example Data (Optional)
-
-Start with demo profile to auto-generate 3 example mind maps:
-
-```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+# OR run with demo data (3 users, 3 mind maps, 35 nodes)
 mvn spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
-This creates:
+Backend starts at: `http://localhost:8080/api/v1`
+
+**Demo data includes:**
 - **Q1 2025 Project Planning** (9 nodes, 2 soft links, comments)
 - **Microservices Architecture Design** (11 nodes, 5 soft links)
 - **Full-Stack Developer Learning Path** (15 nodes, 5 soft links)
 
-### Option 2: Full Stack (Backend + Frontend)
-
-To run both the backend API and the React frontend:
-
-#### Easy Start (Recommended)
-
-Use the convenient start script:
+#### Production Mode (JAR)
 
 ```bash
+# Build JAR
+mvn clean package
+
+# Run JAR
+java -jar target/mindcontroll-1.0.0.jar
+
+# Or with demo profile
+java -jar target/mindcontroll-1.0.0.jar --spring.profiles.active=demo
+```
+
+### Option 2: Run Frontend Only (Development)
+
+```bash
+cd frontend
+
+# Install dependencies (first time)
+npm install
+
+# Start dev server with hot reload
+npm run dev
+```
+
+Frontend starts at: `http://localhost:5173`
+
+**Note**: Frontend requires backend running at `http://localhost:8080/api/v1`
+
+### Option 3: Run Full Stack (Backend + Frontend)
+
+#### Automated Start (Recommended)
+
+```bash
+# Start both services with demo data
 ./start-all.sh
 ```
 
-This will:
-- Start the backend with demo data on port 8080
-- Start the frontend on port 5173
-- Display all service URLs
-- Show logs in the console
+This script:
+- Starts backend with demo profile on port 8080
+- Starts frontend dev server on port 5173
+- Displays all service URLs
+- Shows logs in console
 
-To stop all services:
+**To stop all services:**
 
 ```bash
 ./stop-all.sh
 ```
 
-#### Manual Start
-
-If you prefer to run services manually:
+#### Manual Start (Two Terminals)
 
 ```bash
-# Terminal 1: Start backend with demo data
+# Terminal 1: Backend
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 mvn spring-boot:run -Dspring-boot.run.profiles=demo
 
-# Terminal 2: Start React dev server
+# Terminal 2: Frontend
 cd frontend
-npm install  # First time only
 npm run dev
 ```
-
-The frontend will be available at `http://localhost:5173`
-
-See the [frontend README](frontend/README.md) for more details.
 
 ## Accessing the Application
 
@@ -221,18 +581,27 @@ Password: (leave blank)
 - `GET /search?query={query}` - Search across all mind maps
 - `GET /mindmaps/{mindmapId}/search?query={query}` - Search within a mind map
 
-## Example Usage
+## API Examples
 
-### Create a User (for testing)
+### Complete Workflow Example
 
-First, you'll need to create a user directly in the H2 console or via SQL:
+This section demonstrates a complete workflow from user creation through file upload.
+
+#### 1. Create a User
+
+First, create a user via H2 console (`http://localhost:8080/api/v1/h2-console`):
 
 ```sql
 INSERT INTO users (id, username, display_name, email) 
-VALUES ('user-1', 'john.doe', 'John Doe', 'john@example.com');
+VALUES ('user-123', 'john.doe', 'John Doe', 'john@example.com');
 ```
 
-### Create a Mind Map
+Or if using demo profile, use existing users:
+- `user-1` (Alice Johnson, alice@example.com)
+- `user-2` (Bob Smith, bob@example.com)
+- `user-3` (Charlie Brown, charlie@example.com)
+
+#### 2. Create a Mind Map
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/mindmaps \
@@ -240,21 +609,306 @@ curl -X POST http://localhost:8080/api/v1/mindmaps \
   -d '{
     "name": "Project Planning",
     "description": "Planning for Q1 2025",
-    "ownerId": "user-1"
+    "ownerId": "user-123",
+    "visibility": "PRIVATE",
+    "layout": {
+      "type": "AUTO",
+      "defaultNodeColor": "#4A90E2",
+      "defaultEdgeColor": "#95A5A6",
+      "spacing": 100.0,
+      "padding": 50.0
+    }
   }'
 ```
 
-### Create a Node
+**Response (201 Created):**
+```json
+{
+  "id": "map-456",
+  "name": "Project Planning",
+  "description": "Planning for Q1 2025",
+  "ownerId": "user-123",
+  "visibility": "PRIVATE",
+  "layout": {
+    "type": "AUTO",
+    "defaultNodeColor": "#4A90E2",
+    "defaultEdgeColor": "#95A5A6",
+    "spacing": 100.0,
+    "padding": 50.0
+  },
+  "createdAt": "2025-01-21T12:00:00Z",
+  "updatedAt": "2025-01-21T12:00:00Z"
+}
+```
+
+Save the returned `id` (e.g., `map-456`) for subsequent requests.
+
+#### 3. Create Root Node
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/mindmaps/{mindmapId}/nodes \
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Requirements",
-    "description": "Gather all requirements",
-    "color": "#FF5733",
-    "tags": ["planning", "phase1"]
+    "title": "Project Requirements",
+    "description": "## Overview\n\nGather and document all project requirements.\n\n- Functional requirements\n- Non-functional requirements\n- Constraints",
+    "color": "#E74C3C",
+    "position": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "tags": ["planning", "phase1", "critical"]
   }'
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "node-789",
+  "mindmapId": "map-456",
+  "parentId": null,
+  "title": "Project Requirements",
+  "description": "## Overview\n\nGather and document all project requirements.\n\n- Functional requirements\n- Non-functional requirements\n- Constraints",
+  "color": "#E74C3C",
+  "position": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "tags": ["planning", "phase1", "critical"],
+  "createdAt": "2025-01-21T12:05:00Z",
+  "updatedAt": "2025-01-21T12:05:00Z"
+}
+```
+
+#### 4. Create Child Node
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parentId": "node-789",
+    "title": "User Stories",
+    "description": "Collect user stories from stakeholders",
+    "color": "#3498DB",
+    "position": {
+      "x": 150.0,
+      "y": 100.0
+    },
+    "tags": ["requirements", "agile"]
+  }'
+```
+
+#### 5. Upload Attachment to Node
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789/attachments \
+  -F "file=@/path/to/requirements.pdf" \
+  -F "description=Requirements specification document"
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "attach-101",
+  "nodeId": "node-789",
+  "filename": "requirements.pdf",
+  "originalFilename": "requirements.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 245760,
+  "filePath": "./uploads/attach-101_requirements.pdf",
+  "description": "Requirements specification document",
+  "createdAt": "2025-01-21T12:10:00Z"
+}
+```
+
+#### 6. Upload Image with EXIF Metadata
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789/attachments \
+  -F "file=@/path/to/diagram.jpg" \
+  -F "description=System architecture diagram"
+```
+
+**Response includes EXIF metadata:**
+```json
+{
+  "id": "attach-102",
+  "nodeId": "node-789",
+  "filename": "diagram.jpg",
+  "originalFilename": "diagram.jpg",
+  "mimeType": "image/jpeg",
+  "fileSize": 512000,
+  "filePath": "./uploads/attach-102_diagram.jpg",
+  "description": "System architecture diagram",
+  "metadata": {
+    "width": 1920,
+    "height": 1080,
+    "camera": "Canon EOS 5D",
+    "dateTaken": "2025-01-15T10:30:00Z",
+    "gps": {
+      "latitude": 37.7749,
+      "longitude": -122.4194
+    }
+  },
+  "createdAt": "2025-01-21T12:15:00Z"
+}
+```
+
+#### 7. Download Attachment
+
+```bash
+# Download file
+curl -O http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789/attachments/attach-101/download
+
+# Or with wget
+wget http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789/attachments/attach-101/download
+```
+
+#### 8. Add Comment to Node
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789/comments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "We need to prioritize the mobile app requirements first.",
+    "authorId": "user-123"
+  }'
+```
+
+#### 9. Create Soft Link Between Nodes
+
+```bash
+# First create another node
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Technical Design",
+    "description": "System architecture and design",
+    "color": "#9B59B6",
+    "position": {"x": -150.0, "y": 100.0}
+  }'
+
+# Response will include node ID, e.g., "node-790"
+
+# Create link from Requirements to Design
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/links \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sourceNodeId": "node-789",
+    "targetNodeId": "node-790",
+    "linkType": "DEPENDS_ON",
+    "label": "Design depends on finalized requirements"
+  }'
+```
+
+#### 10. Add Participant to Mind Map
+
+```bash
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/participants \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "user-2",
+    "role": "EDITOR",
+    "permissions": ["READ", "WRITE", "COMMENT"]
+  }'
+```
+
+#### 11. Search Across Mind Maps
+
+```bash
+# Global search
+curl "http://localhost:8080/api/v1/search?query=requirements"
+
+# Search within specific mind map
+curl "http://localhost:8080/api/v1/mindmaps/map-456/search?query=requirements"
+```
+
+#### 12. List All Nodes in Mind Map
+
+```bash
+curl "http://localhost:8080/api/v1/mindmaps/map-456/nodes"
+```
+
+#### 13. Update Node Content
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Project Requirements (Updated)",
+    "description": "## Updated Overview\n\nRevised requirements based on stakeholder feedback.",
+    "color": "#E67E22",
+    "position": {"x": 0.0, "y": 0.0},
+    "tags": ["planning", "phase1", "critical", "revised"]
+  }'
+```
+
+#### 14. Get Mind Map with Full Details
+
+```bash
+curl http://localhost:8080/api/v1/mindmaps/map-456
+```
+
+#### 15. Export Mind Map
+
+```bash
+# Export as JSON
+curl "http://localhost:8080/api/v1/mindmaps/map-456/export?format=JSON" -o mindmap.json
+
+# Export as XML
+curl "http://localhost:8080/api/v1/mindmaps/map-456/export?format=XML" -o mindmap.xml
+
+# Export with attachments (creates ZIP)
+curl "http://localhost:8080/api/v1/mindmaps/map-456/export?format=JSON&includeAttachments=true" -o mindmap.zip
+```
+
+### Additional Examples
+
+#### List Mind Maps with Pagination
+
+```bash
+# First page, 10 items
+curl "http://localhost:8080/api/v1/mindmaps?page=0&size=10"
+
+# Sort by creation date descending
+curl "http://localhost:8080/api/v1/mindmaps?page=0&size=10&sort=createdAt,desc"
+
+# Filter by owner
+curl "http://localhost:8080/api/v1/mindmaps?ownerId=user-123"
+```
+
+#### Bulk Node Operations
+
+```bash
+# Create multiple nodes at once (send array)
+curl -X POST http://localhost:8080/api/v1/mindmaps/map-456/nodes/bulk \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "title": "Node 1",
+      "description": "Description 1",
+      "color": "#FF0000",
+      "position": {"x": 0.0, "y": 0.0}
+    },
+    {
+      "title": "Node 2",
+      "description": "Description 2",
+      "color": "#00FF00",
+      "position": {"x": 100.0, "y": 0.0}
+    }
+  ]'
+```
+
+#### Delete Operations
+
+```bash
+# Delete a node
+curl -X DELETE http://localhost:8080/api/v1/mindmaps/map-456/nodes/node-789
+
+# Delete a link
+curl -X DELETE http://localhost:8080/api/v1/mindmaps/map-456/links/link-101
+
+# Delete a mind map (cascades to all nodes, links, etc.)
+curl -X DELETE http://localhost:8080/api/v1/mindmaps/map-456
 ```
 
 ## Testing
