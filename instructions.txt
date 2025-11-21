@@ -1,0 +1,13 @@
+Implement a Mind Map application called Mind Controll.  This will be a springboot database backed application with a rest interface.  I want you to start by defining an openapi specification for the rest protocol before implementing any code itself.  Ask me any questions required for clarification.  The service should support managaing multiple mindmaps.
+mindmaps should themselves have a name and a description.
+It should be possible to define different layout options that will become relevant to the ui layer.
+Mindmaps should have an owner and a list of people who can participate in the map.
+Map nodes should be creatable, linkinable and removable.
+Nodes should support a description, title one or more links to external resources.
+Nodes descriptions should support rich content.
+Attatchments should be possible to upload and connect to a node.
+Basic discovery api should be included
+an import and export api should be included to import export a mindmap
+Nodes should support colors, tags and comments
+We do not need any security model at this moment.
+

@@ -1,0 +1,1536 @@
+openapi: 3.0.3
+info:
+  title: Mind Controll API
+  description: REST API for managing collaborative mind maps with rich content, attachments, and flexible layouts
+  version: 1.0.0
+  contact:
+    name: Mind Controll API Support
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://api.mindcontroll.example.com/api/v1
+    description: Production server
+
+tags:
+  - name: mindmaps
+    description: Mind map management operations
+  - name: nodes
+    description: Node operations within mind maps
+  - name: links
+    description: Relationship links between nodes
+  - name: comments
+    description: Comments on nodes
+  - name: attachments
+    description: File attachments for nodes
+  - name: tags
+    description: Tag management
+  - name: import-export
+    description: Import and export operations
+  - name: discovery
+    description: Search and discovery operations
+  - name: configuration
+    description: System configuration
+
+paths:
+  # ========== Mind Maps ==========
+  /mindmaps:
+    get:
+      tags: [mindmaps]
+      summary: List all mind maps
+      description: Retrieve a paginated list of mind maps accessible to the user
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: owner
+          in: query
+          description: Filter by owner ID
+          schema:
+            type: string
+        - name: participant
+          in: query
+          description: Filter by participant ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindMapPageResponse'
+    post:
+      tags: [mindmaps]
+      summary: Create a new mind map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MindMapCreateRequest'
+      responses:
+        '201':
+          description: Mind map created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindMap'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /mindmaps/{mindmapId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [mindmaps]
+      summary: Get a mind map by ID
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindMap'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [mindmaps]
+      summary: Update a mind map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MindMapUpdateRequest'
+      responses:
+        '200':
+          description: Mind map updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindMap'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [mindmaps]
+      summary: Delete a mind map
+      responses:
+        '204':
+          description: Mind map deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /mindmaps/{mindmapId}/participants:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [mindmaps]
+      summary: List participants of a mind map
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Participant'
+    post:
+      tags: [mindmaps]
+      summary: Add a participant to a mind map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantRequest'
+      responses:
+        '201':
+          description: Participant added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participant'
+
+  /mindmaps/{mindmapId}/participants/{participantId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - name: participantId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [mindmaps]
+      summary: Remove a participant from a mind map
+      responses:
+        '204':
+          description: Participant removed successfully
+
+  /mindmaps/{mindmapId}/layout:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [mindmaps]
+      summary: Get layout configuration for a mind map
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutConfiguration'
+    put:
+      tags: [mindmaps]
+      summary: Update layout configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LayoutConfiguration'
+      responses:
+        '200':
+          description: Layout updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayoutConfiguration'
+
+  # ========== Nodes ==========
+  /mindmaps/{mindmapId}/nodes:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [nodes]
+      summary: List all nodes in a mind map
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: parentId
+          in: query
+          description: Filter by parent node ID
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: Filter by tags (comma-separated)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodePageResponse'
+    post:
+      tags: [nodes]
+      summary: Create a new node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeCreateRequest'
+      responses:
+        '201':
+          description: Node created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+
+  /mindmaps/{mindmapId}/nodes/{nodeId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+    get:
+      tags: [nodes]
+      summary: Get a node by ID
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [nodes]
+      summary: Update a node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeUpdateRequest'
+      responses:
+        '200':
+          description: Node updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+    delete:
+      tags: [nodes]
+      summary: Delete a node
+      responses:
+        '204':
+          description: Node deleted successfully
+
+  /mindmaps/{mindmapId}/nodes/{nodeId}/position:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+    put:
+      tags: [nodes]
+      summary: Update node position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodePosition'
+      responses:
+        '200':
+          description: Position updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodePosition'
+
+  # ========== Links ==========
+  /mindmaps/{mindmapId}/links:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [links]
+      summary: List all links in a mind map
+      parameters:
+        - name: sourceNodeId
+          in: query
+          description: Filter by source node ID
+          schema:
+            type: string
+        - name: targetNodeId
+          in: query
+          description: Filter by target node ID
+          schema:
+            type: string
+        - name: linkType
+          in: query
+          description: Filter by link type
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeLink'
+    post:
+      tags: [links]
+      summary: Create a link between nodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeLinkCreateRequest'
+      responses:
+        '201':
+          description: Link created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeLink'
+
+  /mindmaps/{mindmapId}/links/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - name: linkId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [links]
+      summary: Get a link by ID
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeLink'
+    put:
+      tags: [links]
+      summary: Update a link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeLinkUpdateRequest'
+      responses:
+        '200':
+          description: Link updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeLink'
+    delete:
+      tags: [links]
+      summary: Delete a link
+      responses:
+        '204':
+          description: Link deleted successfully
+
+  # ========== Comments ==========
+  /mindmaps/{mindmapId}/nodes/{nodeId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+    get:
+      tags: [comments]
+      summary: List comments on a node
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentPageResponse'
+    post:
+      tags: [comments]
+      summary: Add a comment to a node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreateRequest'
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+  /mindmaps/{mindmapId}/nodes/{nodeId}/comments/{commentId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [comments]
+      summary: Get a comment by ID
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+    put:
+      tags: [comments]
+      summary: Update a comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentUpdateRequest'
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+    delete:
+      tags: [comments]
+      summary: Delete a comment
+      responses:
+        '204':
+          description: Comment deleted successfully
+
+  # ========== Attachments ==========
+  /mindmaps/{mindmapId}/nodes/{nodeId}/attachments:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+    get:
+      tags: [attachments]
+      summary: List attachments for a node
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attachment'
+    post:
+      tags: [attachments]
+      summary: Upload an attachment to a node
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                description:
+                  type: string
+              required:
+                - file
+      responses:
+        '201':
+          description: Attachment uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '413':
+          description: File size exceeds maximum limit
+
+  /mindmaps/{mindmapId}/nodes/{nodeId}/attachments/{attachmentId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [attachments]
+      summary: Get attachment metadata
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+    delete:
+      tags: [attachments]
+      summary: Delete an attachment
+      responses:
+        '204':
+          description: Attachment deleted successfully
+
+  /mindmaps/{mindmapId}/nodes/{nodeId}/attachments/{attachmentId}/download:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - $ref: '#/components/parameters/NodeIdParam'
+      - name: attachmentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [attachments]
+      summary: Download an attachment
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  # ========== Tags ==========
+  /mindmaps/{mindmapId}/tags:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [tags]
+      summary: List all tags used in a mind map
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+    post:
+      tags: [tags]
+      summary: Create a standard tag for a mind map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagCreateRequest'
+      responses:
+        '201':
+          description: Tag created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+
+  /mindmaps/{mindmapId}/tags/{tagId}:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+      - name: tagId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [tags]
+      summary: Delete a standard tag
+      responses:
+        '204':
+          description: Tag deleted successfully
+
+  /tags:
+    get:
+      tags: [tags]
+      summary: List all tags across all mind maps
+      parameters:
+        - name: search
+          in: query
+          description: Search tags by name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+
+  # ========== Import/Export ==========
+  /mindmaps/{mindmapId}/export:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    post:
+      tags: [import-export]
+      summary: Export a mind map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format:
+                  type: string
+                  enum: [json, xml]
+                  description: Export format
+                includeAttachments:
+                  type: boolean
+                  description: Whether to include attachments in a ZIP file
+                  default: false
+              required:
+                - format
+      responses:
+        '200':
+          description: Export successful
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: object
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /mindmaps/import:
+    post:
+      tags: [import-export]
+      summary: Import a mind map
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JSON, XML, or ZIP file containing the mind map
+                format:
+                  type: string
+                  enum: [json, xml]
+                  description: Format of the import file (auto-detected if not specified)
+              required:
+                - file
+      responses:
+        '201':
+          description: Import successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MindMap'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ========== Discovery ==========
+  /search:
+    get:
+      tags: [discovery]
+      summary: Search across all mind maps
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+        - name: mindmapId
+          in: query
+          description: Limit search to specific mind map
+          schema:
+            type: string
+        - name: searchIn
+          in: query
+          description: What to search in
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [title, description, content, tags, comments]
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResultPageResponse'
+
+  /mindmaps/{mindmapId}/search:
+    parameters:
+      - $ref: '#/components/parameters/MindMapIdParam'
+    get:
+      tags: [discovery]
+      summary: Search within a specific mind map
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+        - name: searchIn
+          in: query
+          description: What to search in
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [title, description, content, tags, comments]
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResultPageResponse'
+
+  # ========== Configuration ==========
+  /config:
+    get:
+      tags: [configuration]
+      summary: Get system configuration
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfiguration'
+
+components:
+  parameters:
+    MindMapIdParam:
+      name: mindmapId
+      in: path
+      required: true
+      description: Mind map ID
+      schema:
+        type: string
+
+    NodeIdParam:
+      name: nodeId
+      in: path
+      required: true
+      description: Node ID
+      schema:
+        type: string
+
+    PageParam:
+      name: page
+      in: query
+      description: Page number (0-indexed)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    SizeParam:
+      name: size
+      in: query
+      description: Page size
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortParam:
+      name: sort
+      in: query
+      description: Sort criteria (e.g., "name,asc" or "createdAt,desc")
+      schema:
+        type: string
+
+  schemas:
+    # ========== Mind Map Schemas ==========
+    MindMap:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        name:
+          type: string
+          description: Mind map name
+        description:
+          type: string
+          description: Mind map description
+        owner:
+          $ref: '#/components/schemas/User'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+        layoutConfiguration:
+          $ref: '#/components/schemas/LayoutConfiguration'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: User ID who created the mind map
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+          description: User ID who last updated the mind map
+      required:
+        - id
+        - name
+        - owner
+        - createdAt
+        - createdBy
+
+    MindMapCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        ownerId:
+          type: string
+          description: Owner user ID
+        layoutConfiguration:
+          $ref: '#/components/schemas/LayoutConfiguration'
+      required:
+        - name
+        - ownerId
+
+    MindMapUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        layoutConfiguration:
+          $ref: '#/components/schemas/LayoutConfiguration'
+
+    MindMapPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MindMap'
+
+    # ========== Layout Schemas ==========
+    LayoutConfiguration:
+      type: object
+      properties:
+        layoutType:
+          type: string
+          enum: [AUTO, XY_FIXED, XY_HYBRID, RADIAL, TREE]
+          description: |
+            - AUTO: Automatic layout
+            - XY_FIXED: All nodes have fixed X/Y positions
+            - XY_HYBRID: Some nodes fixed, others float
+            - RADIAL: Radial layout from center
+            - TREE: Hierarchical tree layout
+          default: AUTO
+        zoom:
+          type: number
+          format: float
+          minimum: 0.1
+          maximum: 10.0
+          default: 1.0
+        centerX:
+          type: number
+          format: float
+          description: X coordinate of viewport center
+        centerY:
+          type: number
+          format: float
+          description: Y coordinate of viewport center
+        treeOrientation:
+          type: string
+          enum: [TOP_DOWN, BOTTOM_UP, LEFT_RIGHT, RIGHT_LEFT]
+          description: Orientation for tree layout
+        nodeSpacing:
+          type: number
+          format: float
+          description: Spacing between nodes in auto layouts
+          default: 100.0
+        levelSpacing:
+          type: number
+          format: float
+          description: Spacing between levels in tree layout
+          default: 150.0
+
+    # ========== Node Schemas ==========
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        mindmapId:
+          type: string
+          description: Parent mind map ID
+        parentId:
+          type: string
+          description: Parent node ID (null for root nodes)
+        title:
+          type: string
+          description: Node title
+        description:
+          type: string
+          description: Rich content description (supports HTML/Markdown)
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Node color in hex format
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags associated with the node
+        externalLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalLink'
+          description: Links to external resources
+        position:
+          $ref: '#/components/schemas/NodePosition'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: User ID who created the node
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+          description: User ID who last updated the node
+      required:
+        - id
+        - mindmapId
+        - title
+        - createdAt
+        - createdBy
+
+    NodeCreateRequest:
+      type: object
+      properties:
+        parentId:
+          type: string
+          description: Parent node ID (null for root nodes)
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        tags:
+          type: array
+          items:
+            type: string
+        externalLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalLink'
+        position:
+          $ref: '#/components/schemas/NodePosition'
+      required:
+        - title
+
+    NodeUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        description:
+          type: string
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        tags:
+          type: array
+          items:
+            type: string
+        externalLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalLink'
+
+    NodePosition:
+      type: object
+      properties:
+        x:
+          type: number
+          format: float
+        y:
+          type: number
+          format: float
+        isFixed:
+          type: boolean
+          description: Whether position is fixed or can float in hybrid mode
+          default: false
+
+    NodePageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/Node'
+
+    ExternalLink:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        title:
+          type: string
+        description:
+          type: string
+      required:
+        - url
+
+    # ========== Link Schemas ==========
+    NodeLink:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        mindmapId:
+          type: string
+          description: Mind map ID
+        sourceNodeId:
+          type: string
+          description: Source node ID
+        targetNodeId:
+          type: string
+          description: Target node ID
+        linkType:
+          type: string
+          description: Type of relationship (e.g., "relates-to", "depends-on", "similar-to")
+        label:
+          type: string
+          description: Display label for the link
+        bidirectional:
+          type: boolean
+          description: Whether the link is bidirectional
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: User ID who created the link
+      required:
+        - id
+        - mindmapId
+        - sourceNodeId
+        - targetNodeId
+        - linkType
+        - createdAt
+        - createdBy
+
+    NodeLinkCreateRequest:
+      type: object
+      properties:
+        sourceNodeId:
+          type: string
+        targetNodeId:
+          type: string
+        linkType:
+          type: string
+        label:
+          type: string
+        bidirectional:
+          type: boolean
+          default: false
+      required:
+        - sourceNodeId
+        - targetNodeId
+        - linkType
+
+    NodeLinkUpdateRequest:
+      type: object
+      properties:
+        linkType:
+          type: string
+        label:
+          type: string
+        bidirectional:
+          type: boolean
+
+    # ========== Comment Schemas ==========
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        nodeId:
+          type: string
+          description: Node ID this comment belongs to
+        parentCommentId:
+          type: string
+          description: Parent comment ID for threaded comments
+        content:
+          type: string
+          description: Comment content
+        author:
+          $ref: '#/components/schemas/User'
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+          description: Nested replies
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - nodeId
+        - content
+        - author
+        - createdAt
+
+    CommentCreateRequest:
+      type: object
+      properties:
+        parentCommentId:
+          type: string
+          description: Parent comment ID for replies
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        authorId:
+          type: string
+          description: Author user ID
+      required:
+        - content
+        - authorId
+
+    CommentUpdateRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 5000
+      required:
+        - content
+
+    CommentPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
+
+    # ========== Attachment Schemas ==========
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        nodeId:
+          type: string
+          description: Node ID this attachment belongs to
+        filename:
+          type: string
+          description: Original filename
+        contentType:
+          type: string
+          description: MIME type
+        size:
+          type: integer
+          format: int64
+          description: File size in bytes
+        description:
+          type: string
+        url:
+          type: string
+          description: URL to download the attachment
+        thumbnailUrl:
+          type: string
+          description: URL to thumbnail (for images)
+        exifData:
+          $ref: '#/components/schemas/ExifData'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: User ID who uploaded the attachment
+      required:
+        - id
+        - nodeId
+        - filename
+        - contentType
+        - size
+        - url
+        - createdAt
+        - createdBy
+
+    ExifData:
+      type: object
+      properties:
+        width:
+          type: integer
+        height:
+          type: integer
+        cameraMake:
+          type: string
+        cameraModel:
+          type: string
+        dateTaken:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        orientation:
+          type: integer
+        iso:
+          type: integer
+        aperture:
+          type: string
+        exposureTime:
+          type: string
+        focalLength:
+          type: string
+
+    # ========== Tag Schemas ==========
+    Tag:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        name:
+          type: string
+          description: Tag name
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Tag color in hex format
+        mindmapId:
+          type: string
+          description: Mind map ID (null for global tags)
+        isStandard:
+          type: boolean
+          description: Whether this is a standard tag defined for the mind map
+        usageCount:
+          type: integer
+          description: Number of times this tag is used
+      required:
+        - id
+        - name
+
+    TagCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+      required:
+        - name
+
+    # ========== User & Participant Schemas ==========
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        username:
+          type: string
+          description: Username
+        displayName:
+          type: string
+          description: Display name
+        email:
+          type: string
+          format: email
+      required:
+        - id
+        - username
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        user:
+          $ref: '#/components/schemas/User'
+        permission:
+          type: string
+          enum: [VIEW, EDIT, ADMIN]
+          description: Permission level
+        addedAt:
+          type: string
+          format: date-time
+        addedBy:
+          type: string
+          description: User ID who added this participant
+      required:
+        - id
+        - user
+        - permission
+        - addedAt
+        - addedBy
+
+    ParticipantRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        permission:
+          type: string
+          enum: [VIEW, EDIT, ADMIN]
+          default: EDIT
+      required:
+        - userId
+
+    # ========== Search Schemas ==========
+    SearchResult:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [MINDMAP, NODE, COMMENT]
+          description: Type of search result
+        mindmapId:
+          type: string
+          description: Mind map ID
+        mindmapName:
+          type: string
+          description: Mind map name
+        nodeId:
+          type: string
+          description: Node ID (if applicable)
+        nodeTitle:
+          type: string
+          description: Node title (if applicable)
+        commentId:
+          type: string
+          description: Comment ID (if applicable)
+        excerpt:
+          type: string
+          description: Excerpt showing match context
+        score:
+          type: number
+          format: float
+          description: Relevance score
+      required:
+        - type
+        - mindmapId
+        - excerpt
+
+    SearchResultPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/SearchResult'
+
+    # ========== Configuration Schemas ==========
+    SystemConfiguration:
+      type: object
+      properties:
+        maxAttachmentSize:
+          type: integer
+          format: int64
+          description: Maximum attachment size in bytes
+        supportedImageFormats:
+          type: array
+          items:
+            type: string
+          description: Supported image formats for EXIF extraction
+        version:
+          type: string
+          description: API version
+
+    # ========== Common Schemas ==========
+    PageResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+        page:
+          type: integer
+          description: Current page number
+        size:
+          type: integer
+          description: Page size
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of elements
+        totalPages:
+          type: integer
+          description: Total number of pages
+        first:
+          type: boolean
+          description: Whether this is the first page
+        last:
+          type: boolean
+          description: Whether this is the last page
+      required:
+        - content
+        - page
+        - size
+        - totalElements
+        - totalPages
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

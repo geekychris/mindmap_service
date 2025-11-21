@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: mindcontroll
+  
+  # Database Configuration (H2 for development)
+  datasource:
+    url: jdbc:h2:mem:mindcontroll
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  # JPA/Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+  
+  # H2 Console (for development)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # File Upload Configuration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+      file-size-threshold: 2KB
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+# Application Configuration
+mindcontroll:
+  storage:
+    location: ./uploads
+  attachment:
+    max-size: 52428800  # 50MB in bytes
+  image:
+    supported-formats: jpg,jpeg,png,gif,bmp,tiff,webp
+
+# SpringDoc OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
