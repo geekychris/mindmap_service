@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Mindmap Service logo" width="180">
+</p>
+
 # Mind Controll
 
 A full-stack collaborative mind mapping application with a Spring Boot REST API backend and a React TypeScript frontend.
